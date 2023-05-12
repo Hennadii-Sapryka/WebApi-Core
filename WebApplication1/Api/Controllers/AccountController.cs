@@ -8,6 +8,7 @@ using WebApi.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.IdentityModel.Tokens;
+using WebApi.Repo;
 
 namespace WebApi.Api.Controllers
 {
@@ -15,26 +16,36 @@ namespace WebApi.Api.Controllers
     [ApiController]
     public class AccountController : ControllerBase
     {
-        private readonly Context dbContext;
+        private readonly Context _dbContext;
         private readonly IHttpContextAccessor _httpContextAccessor;
-        public AccountController(Context context, IHttpContextAccessor httpContextAccessor)
+        private readonly Repository<User> _repository;
+        public AccountController(Context context, IHttpContextAccessor httpContextAccessor, Repository<User> repository)
         {
-            dbContext = context;
+            _dbContext = context;
             _httpContextAccessor = httpContextAccessor;
+            _repository = repository;
+
         }
 
-        //[HttpPost("register")]
-        //public async Task<IActionResult> Register([FromBody] LoginUser loginUser)
-        //{
-        //    var isUser = new LoginUser() { Email = loginUser.Email, Password = loginUser.Password, UserName = loginUser.UserName, Role = "" };
-        //}
+        [HttpPost("/register")]
+        public async Task<IActionResult> Register([FromBody] LoginUser loginUser)
+        {
+            var userRepo = await _repository.Query().FirstOrDefaultAsync(u => u.Email == loginUser.Email);
+            if (userRepo != null)
+            {
+                return StatusCode(StatusCodes.Status200OK);
+            }
+            var isUser = new LoginUser() { Email = loginUser.Email, Password = loginUser.Password, UserName = loginUser.UserName };
+            return StatusCode(StatusCodes.Status201Created);
+        }
 
         [HttpPost]
-        [Route("/LogIn")]
+        [Route("/logIn")]
         public async Task<IActionResult> LogIn([FromBody] LoginUser loginUser)
         {
-            if (loginUser.Email.IsNullOrEmpty()) return BadRequest("Field of Email is empty"); ;
-            var loggedInUser = await dbContext.Electricians!.FirstOrDefaultAsync(u => u.Email == loginUser.Email);
+            if (loginUser.Email.IsNullOrEmpty()) return BadRequest("Field of Email is empty");
+            var loggedInUser = await _dbContext.Users!.FirstOrDefaultAsync(u => u.Email == loginUser.Email);
+
             if (loggedInUser is null) return BadRequest("No exist user");
             
             var claims = new List<Claim>
@@ -47,20 +58,21 @@ namespace WebApi.Api.Controllers
 
             await _httpContextAccessor.HttpContext!.SignInAsync(claimsPrincipal);
             
-            return StatusCode(StatusCodes.Status200OK); ;
+            return StatusCode(StatusCodes.Status200OK);
         }
+
         [HttpGet]
-        [Route("/LogOut")]
+        [Route("logOut")]
         public async Task<IActionResult> LogOut()
         {
             await _httpContextAccessor.HttpContext!.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Redirect("/");
         }
 
-        //public Electrician Authentication(LoginUser login)
+        //public User Authentication(LoginUser login)
         //{
-        //    Electrician user = null;
-        //    if (dbContext.Electricians!.Where(u => u.Email == login.Email && u.).Any()  return user;
+        //    User user = null;
+        //    if (dbContext.users!.Where(u => u.Email == login.Email).Any()  return user;
         //}
     }
 }

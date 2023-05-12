@@ -5,24 +5,30 @@ namespace WebApi.Models
 {
     public class Electrician
     {
-        [Key]
-        public int Id { get; set; }
-        public string? Name { get; set; }    
-        public string? Email { get; set; }
-        public string? WebSite { get; set; }
-        [Column("Brands")]
-        public string? ServicesOfBrends { get; set; }
-        public string? Fee { get; set; }
-        public string? FeePerHour { get; set; }
-        public string? RadiusMaxToWork { get; set; }
-        public string? SpecialTerms { get; set; }
+        //[Key]
+        //public override int Id { get; set; }
+        //[Required]
+        //public override string? Name { get; set; }
+        //[Required]
+        //public override string? Email { get; set; }
+        //[Required]
+        //public override string? PhoneNumber { get; set; }
+        //public  string? WebSite { get; set; }
+        //[Column("Brands")]
+        //public  string? ServicesOfBrands { get; set; }
+        //public  string? Fee { get; set; }
+        //public  string? FeePerHour { get; set; }
+        //public  string? RadiusMaxToWork { get; set; }
+        //public  string? SpecialTerms { get; set; }
 
-        public bool IsAproved { get; set; } = false;
-        public bool IsOwnShop { get; set; } = false;
-        public string? Role { get; set; }
-        [NotMapped]
-        public List<string> ScillsList { get; set; } = new();
-        [NotMapped]
-        public List<string> Feedbacks { get; set; } = new();
+        //public override bool IsApproved { get; set; }
+        //public  bool IsOwnBusiness { get; set; }
+        //public bool IsTechnicians { get; set; } = true;
+        //public override string? Role { get; set; } = "technical";
+        //[NotMapped]
+        //public ICollection<string>? Skills { get; set; } = new List<string>();
+        //[NotMapped]
+        //public override ICollection<string>? Feedbacks { get; set; }
+        //public override ICollection<Location>? Locations { get; set; }
     }
 }

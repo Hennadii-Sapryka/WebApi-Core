@@ -8,6 +8,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication;
 using System.Security.Claims;
+using WebApi.Repo;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +20,8 @@ var connectionString = "Server=(localdb)\\mssqllocaldb;Database=React+Dot;Truste
 // Add services to the container.
 builder.Services.AddDbContext<Context>(opt => opt.UseSqlServer(connectionString));
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddTransient<Repository<User>>();
+builder.Services.AddTransient <ILogger<Program>>();
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -28,6 +33,8 @@ builder.Services.AddAuthorization(opts =>
     opts.AddPolicy("OnlyForOwner", policy =>
     {
         policy.RequireClaim("role", "owner");
+        policy.RequireClaim("role", "technician");
+        policy.RequireClaim("role", "admin");
     });
 });
 
@@ -61,7 +68,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-app.MapGet("/electricians", [Authorize(Policy = "OnlyForOwner")] async (Context context) => Results.Ok(await context.Electricians?.ToListAsync()));
+app.MapGet("/electricians", [Authorize(Policy = "OnlyForOwner")] async (Context context) => Results.Ok(await context.Users!.ToListAsync()));
+
 app.UseHttpsRedirection();
 
 app.UseAuthentication();

@@ -9,6 +9,7 @@ using System.Security.Claims;
 using Microsoft.Extensions.Configuration.UserSecrets;
 using System.Net;
 using Microsoft.AspNetCore.Authorization;
+using WebApi.Repo;
 
 namespace WebApi.Api.Controllers
 {
@@ -16,15 +17,17 @@ namespace WebApi.Api.Controllers
     [ApiController]
 
 
-    public class ElectricianController : ControllerBase
+    public class UserController : ControllerBase
     {
-        private readonly ILogger<ElectricianController> _logger;
+        private readonly ILogger<UserController> _logger;
         private readonly Context dbContext;
+        private readonly Repository<User> _repository;
 
-        public ElectricianController(ILogger<ElectricianController> logger, Context context)
+        public UserController(ILogger<UserController> logger, Context context, Repository<User> repository)
         {
             _logger = logger;
             dbContext = context;
+            _repository = repository;
         }
 
         //[HttpGet]
@@ -35,7 +38,7 @@ namespace WebApi.Api.Controllers
         //    {
         //        return StatusCode(StatusCodes.Status204NoContent);
         //    }
-        //    //var skils = dbContext.Electricians.Include(c=>c.ScillsList).ToList();
+        //    //var skills = dbContext.Electricians.Include(c=>c.SkillsList).ToList();
         //    List<Electrician> list = await dbContext.Electricians.ToListAsync();
 
         //    return StatusCode(StatusCodes.Status200OK, list);
@@ -44,69 +47,94 @@ namespace WebApi.Api.Controllers
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetElectriciansById(int id)
         {
-            var userId = await dbContext.Electricians?.Where(u => u.Id == id).FirstOrDefaultAsync();
+            var testUserRepo = await _repository.Query().FirstOrDefaultAsync(u => u.Id == id);
+            var userId = await dbContext.Users!.Where(u => u.Id == id).FirstOrDefaultAsync();
 
-            return  userId != null 
-                ? StatusCode(StatusCodes.Status200OK, await dbContext.Electricians!.FirstOrDefaultAsync(p => p.Id == id)) 
+            return userId != null
+                ? StatusCode(StatusCodes.Status200OK, await dbContext.Users!.FirstOrDefaultAsync(p => p.Id == id))
+                : StatusCode(StatusCodes.Status204NoContent);
+        }
+
+        //[Authorize(Policy = "OnlyForAdmin")]
+        [HttpGet("/All")]
+        public async Task<IActionResult> GetAll()
+        {
+            var users = await dbContext.Users!.FirstOrDefaultAsync();
+
+            return users != null
+                ? StatusCode(StatusCodes.Status200OK, await dbContext.Users!.FirstOrDefaultAsync())
                 : StatusCode(StatusCodes.Status204NoContent);
         }
 
         [HttpPost]
-        [Route("/AddElectrician")]
-        public async Task<ActionResult<Electrician>> AddElectrician(Electrician electrician)
+        [Route("/AddUser")]
+        public async Task<ActionResult> AddUser(string name, string email, string phone, bool isOwnShop)
         {
             if (!ModelState.IsValid)
                 return BadRequest("Invalid data.");
 
-            dbContext.Electricians!.Add(electrician);
+            User user = new();
+            user.Name = name;
+            user.Email = email;
+            user.PhoneNumber = phone;
+            isOwnShop = !isOwnShop
+                ? user.IsTechnicians = true
+                : user.IsOwnBusiness = true;
+
+            BusinessChecker(user);
+
+            await dbContext.AddAsync(user);
             await dbContext.SaveChangesAsync();
             return StatusCode(StatusCodes.Status201Created);
         }
 
         [HttpPut]
-        public async Task<ActionResult<Electrician>> Update( [FromBody]Electrician electrician)
+        public async Task<ActionResult<User>> Update([FromBody] User user)
         {
-            var userToUpdate = await dbContext.Electricians!.FindAsync(electrician.Id);
+            var userToUpdate = await dbContext.Users!.FindAsync(user.Id);
 
             if (userToUpdate == null)
-            {
                 return StatusCode(StatusCodes.Status204NoContent);
-            }
-            userToUpdate.Name = electrician.Name;
-            userToUpdate.Email = electrician.Email;
 
-            dbContext.Update(userToUpdate); 
+            userToUpdate.Name = user.Name;
+            userToUpdate.Email = user.Email;
+
+            dbContext.Update(userToUpdate);
             await dbContext.SaveChangesAsync();
             return StatusCode(StatusCodes.Status202Accepted);
         }
 
         [HttpDelete]
         [Route("/DeleteById")]
-        public async Task<ActionResult<Electrician>> DeleteElectrician(int id)
+        public async Task<ActionResult<User>> DeleteUser(int id)
         {
-            var electrician = await dbContext.Electricians?.FirstOrDefaultAsync(t => t.Id == id);
-            if (electrician == null)
+            var currentUser = await dbContext.Users!.FirstOrDefaultAsync(t => t.Id == id);
+            if (currentUser == null)
             {
                 return StatusCode(StatusCodes.Status204NoContent);
             }
 
-            dbContext.Electricians.Remove(electrician);
+            dbContext.Users!.Remove(currentUser);
             dbContext.SaveChanges();
             return StatusCode(StatusCodes.Status200OK);
         }
 
-        private bool isElectrician(int id)
+        private User BusinessChecker(User user)
         {
-            if (dbContext.Electricians.Any(p => p.Id == id))
-                return true;
-            return false;
+            if (user.IsOwnBusiness == true)
+            {
+                user.Role = "owner";
+                return user;
+            }
+            user.Role = "technician";
+            return user;
         }
 
         //public async Task<ActionResult<Electrician>> AcceptPolicyAsync()
         //{
         //    var userContext = await dbContext.Electricians.FirstOrDefaultAsync(u => u.Id == userId);
         //    var userId = HttpContext!.User;
-           
+
         //    var user = await dbContext.Electricians.FirstOrDefaultAsync(u => u.Id == userId);
 
         //    user.IsPolicyAccepted = true;
