@@ -72,14 +72,9 @@ namespace WebApi.Api.Controllers
             if (userToUpdate == null)
                 return StatusCode(StatusCodes.Status204NoContent);
 
-            User newUser = new()
-            {
-                Email = "test@gmai.gmail"
-            };
+            _repository.Detach(userToUpdate);
 
-            //_repository.Detach(userToUpdate);
-
-            userToUpdate = _mapper.Map(user, newUser);
+            userToUpdate = _mapper.Map(user, userToUpdate);
 
             await _repository.UpdateAsync(userToUpdate);
             await _repository.SaveChangesAsync();
