@@ -26,7 +26,8 @@ namespace WebApi.Migrations
                     IsApproved = table.Column<bool>(type: "bit", nullable: false),
                     IsOwnBusiness = table.Column<bool>(type: "bit", nullable: false),
                     IsTechnicians = table.Column<bool>(type: "bit", nullable: false),
-                    Role = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    Role = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: true)
                 },
                 constraints: table =>
                 {

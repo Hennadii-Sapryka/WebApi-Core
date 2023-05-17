@@ -9,6 +9,9 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.IdentityModel.Tokens;
 using WebApi.Repo;
+using BCrypt.Net;
+using AutoMapper;
+using WebApi.Mapping;
 
 namespace WebApi.Api.Controllers
 {
@@ -19,24 +22,38 @@ namespace WebApi.Api.Controllers
         private readonly Context _dbContext;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly Repository<User> _repository;
-        public AccountController(Context context, IHttpContextAccessor httpContextAccessor, Repository<User> repository)
+        private readonly IMapper _mapper;
+        public AccountController(Context context, IHttpContextAccessor httpContextAccessor, Repository<User> repository, IMapper mapper)
         {
             _dbContext = context;
             _httpContextAccessor = httpContextAccessor;
             _repository = repository;
-
+            _mapper = mapper;
         }
 
         [HttpPost("/register")]
-        public async Task<IActionResult> Register([FromBody] LoginUser loginUser)
+        public async Task<IActionResult> Register([FromBody] LoginUser loginUser, bool isOwnShop)
         {
             var userRepo = await _repository.Query().FirstOrDefaultAsync(u => u.Email == loginUser.Email);
-            if (userRepo != null)
+            if (userRepo != null && loginUser.Email == userRepo.Email) return await LogIn(loginUser);
+
+            var newUser = new LoginUser()
             {
-                return StatusCode(StatusCodes.Status200OK);
-            }
-            var isUser = new LoginUser() { Email = loginUser.Email, Password = loginUser.Password, UserName = loginUser.UserName };
-            return StatusCode(StatusCodes.Status201Created);
+                Email = loginUser.Email!.ToLower(),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(loginUser.PasswordHash),
+                Name = loginUser.Name
+            };
+            var user = _mapper.Map<LoginUser, User>(newUser);
+
+            isOwnShop = !isOwnShop
+                ? user.IsTechnicians = true
+                : user.IsOwnBusiness = true;
+
+            BusinessChecker(user);
+            await _repository.AddAsync(user);
+            await _repository.SaveChangesAsync();
+
+            return StatusCode(StatusCodes.Status201Created, user);
         }
 
         [HttpPost]
@@ -47,7 +64,8 @@ namespace WebApi.Api.Controllers
             var loggedInUser = await _dbContext.Users!.FirstOrDefaultAsync(u => u.Email == loginUser.Email);
 
             if (loggedInUser is null) return BadRequest("No exist user");
-            
+            if (!BCrypt.Net.BCrypt.Verify(loginUser.PasswordHash, loginUser.PasswordHash)) return BadRequest("Password is incorrect");
+
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Email, loggedInUser.Email!),
@@ -57,7 +75,7 @@ namespace WebApi.Api.Controllers
             var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
 
             await _httpContextAccessor.HttpContext!.SignInAsync(claimsPrincipal);
-            
+
             return StatusCode(StatusCodes.Status200OK);
         }
 
@@ -67,6 +85,17 @@ namespace WebApi.Api.Controllers
         {
             await _httpContextAccessor.HttpContext!.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Redirect("/");
+        }
+
+        private User BusinessChecker(User user)
+        {
+            if (user.IsOwnBusiness == true)
+            {
+                user.Role = "owner";
+                return user;
+            }
+            user.Role = "technician";
+            return user;
         }
 
         //public User Authentication(LoginUser login)

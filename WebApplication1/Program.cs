@@ -11,17 +11,27 @@ using System.Security.Claims;
 using WebApi.Repo;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Hosting;
+using Serilog;
+using Microsoft.IdentityModel.Logging;
+using System.Xml.Linq;
+using AutoMapper;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
 var connectionString = "Server=(localdb)\\mssqllocaldb;Database=React+Dot;Trusted_Connection=True;";
 
+
 // Add services to the container.
-builder.Services.AddDbContext<Context>(opt => opt.UseSqlServer(connectionString));
+builder.Services.AddDbContext<Context>(opt => { opt.UseSqlServer(connectionString);opt.EnableSensitiveDataLogging();}) ;
+
+builder.Configuration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+builder.Configuration.AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("Development")}.json", optional: true);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient<Repository<User>>();
-builder.Services.AddTransient <ILogger<Program>>();
+builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+
+
+
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -33,8 +43,17 @@ builder.Services.AddAuthorization(opts =>
     opts.AddPolicy("OnlyForOwner", policy =>
     {
         policy.RequireClaim("role", "owner");
-        policy.RequireClaim("role", "technician");
+
+    });
+
+    opts.AddPolicy("OnlyForAdmin", policy =>
+    {
         policy.RequireClaim("role", "admin");
+    });
+
+    opts.AddPolicy("OnlyForTechnician", policy =>
+    {
+        policy.RequireClaim("role", "technician");
     });
 });
 
@@ -68,7 +87,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-app.MapGet("/electricians", [Authorize(Policy = "OnlyForOwner")] async (Context context) => Results.Ok(await context.Users!.ToListAsync()));
+app.MapGet("/GetAllTechnicians", [Authorize(Policy = "OnlyForTechnician")] async ( Context context) =>
+
+
+    Results.Ok(await context.Users!.ToListAsync()));
+
+app.Logger.LogInformation("starting the app ...");
 
 app.UseHttpsRedirection();
 

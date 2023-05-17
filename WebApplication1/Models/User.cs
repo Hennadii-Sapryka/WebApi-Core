@@ -19,10 +19,12 @@ namespace WebApi.Models
         public  bool IsOwnBusiness { get; set; } = false;
         public  bool IsTechnicians { get; set; } = false;
         public  string? Role { get; set; }
+        public string? PasswordHash { get; set; }
         [NotMapped]
         public ICollection<string>? Skills { get; set; }
         [NotMapped]
         public ICollection<string>? Feedbacks { get; set; } = new List<string>();
+        [NotMapped]
         public ICollection<Location>? Locations { get; set; } = new List<Location>();
     }
 }

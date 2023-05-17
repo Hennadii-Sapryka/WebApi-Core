@@ -6,10 +6,9 @@ using System.Linq;
 using WebApi.Data;
 using WebApi.Models;
 using System.Security.Claims;
-using Microsoft.Extensions.Configuration.UserSecrets;
-using System.Net;
 using Microsoft.AspNetCore.Authorization;
 using WebApi.Repo;
+using AutoMapper;
 
 namespace WebApi.Api.Controllers
 {
@@ -20,13 +19,13 @@ namespace WebApi.Api.Controllers
     public class UserController : ControllerBase
     {
         private readonly ILogger<UserController> _logger;
-        private readonly Context dbContext;
         private readonly Repository<User> _repository;
+        private readonly IMapper _mapper;
 
-        public UserController(ILogger<UserController> logger, Context context, Repository<User> repository)
+        public UserController(ILogger<UserController> logger, Repository<User> repository, IMapper mapper, Context dbContext)
         {
             _logger = logger;
-            dbContext = context;
+            _mapper = mapper;
             _repository = repository;
         }
 
@@ -45,89 +44,61 @@ namespace WebApi.Api.Controllers
         //}
         [Authorize(Policy = "OnlyForOwner")]
         [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetElectriciansById(int id)
+        public async Task<IActionResult> GetUserById(int id)
         {
-            var testUserRepo = await _repository.Query().FirstOrDefaultAsync(u => u.Id == id);
-            var userId = await dbContext.Users!.Where(u => u.Id == id).FirstOrDefaultAsync();
+            var user = await _repository.Query().FirstOrDefaultAsync(u => u.Id == id);
 
-            return userId != null
-                ? StatusCode(StatusCodes.Status200OK, await dbContext.Users!.FirstOrDefaultAsync(p => p.Id == id))
+            return user != null
+                ? StatusCode(StatusCodes.Status200OK, user)
                 : StatusCode(StatusCodes.Status204NoContent);
         }
 
         //[Authorize(Policy = "OnlyForAdmin")]
         [HttpGet("/All")]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAllUsers()
         {
-            var users = await dbContext.Users!.FirstOrDefaultAsync();
+            var users = await _repository.Query().FirstOrDefaultAsync();
 
             return users != null
-                ? StatusCode(StatusCodes.Status200OK, await dbContext.Users!.FirstOrDefaultAsync())
+                ? StatusCode(StatusCodes.Status200OK, users)
                 : StatusCode(StatusCodes.Status204NoContent);
         }
 
-        [HttpPost]
-        [Route("/AddUser")]
-        public async Task<ActionResult> AddUser(string name, string email, string phone, bool isOwnShop)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest("Invalid data.");
-
-            User user = new();
-            user.Name = name;
-            user.Email = email;
-            user.PhoneNumber = phone;
-            isOwnShop = !isOwnShop
-                ? user.IsTechnicians = true
-                : user.IsOwnBusiness = true;
-
-            BusinessChecker(user);
-
-            await dbContext.AddAsync(user);
-            await dbContext.SaveChangesAsync();
-            return StatusCode(StatusCodes.Status201Created);
-        }
-
-        [HttpPut]
+        [HttpPut("/Update")]
         public async Task<ActionResult<User>> Update([FromBody] User user)
         {
-            var userToUpdate = await dbContext.Users!.FindAsync(user.Id);
+            var userToUpdate = await _repository.Query().FirstOrDefaultAsync(u => u.Id == user.Id);
 
             if (userToUpdate == null)
                 return StatusCode(StatusCodes.Status204NoContent);
 
-            userToUpdate.Name = user.Name;
-            userToUpdate.Email = user.Email;
+            User newUser = new()
+            {
+                Email = "test@gmai.gmail"
+            };
 
-            dbContext.Update(userToUpdate);
-            await dbContext.SaveChangesAsync();
-            return StatusCode(StatusCodes.Status202Accepted);
+            //_repository.Detach(userToUpdate);
+
+            userToUpdate = _mapper.Map(user, newUser);
+
+            await _repository.UpdateAsync(userToUpdate);
+            await _repository.SaveChangesAsync();
+
+            return StatusCode(StatusCodes.Status202Accepted, userToUpdate);
         }
 
         [HttpDelete]
         [Route("/DeleteById")]
         public async Task<ActionResult<User>> DeleteUser(int id)
         {
-            var currentUser = await dbContext.Users!.FirstOrDefaultAsync(t => t.Id == id);
+            var currentUser = await _repository.Query().FirstOrDefaultAsync(t => t.Id == id);
+
             if (currentUser == null)
-            {
                 return StatusCode(StatusCodes.Status204NoContent);
-            }
 
-            dbContext.Users!.Remove(currentUser);
-            dbContext.SaveChanges();
+            _repository.Delete(currentUser);
+            await _repository.SaveChangesAsync();
             return StatusCode(StatusCodes.Status200OK);
-        }
-
-        private User BusinessChecker(User user)
-        {
-            if (user.IsOwnBusiness == true)
-            {
-                user.Role = "owner";
-                return user;
-            }
-            user.Role = "technician";
-            return user;
         }
 
         //public async Task<ActionResult<Electrician>> AcceptPolicyAsync()
@@ -144,6 +115,4 @@ namespace WebApi.Api.Controllers
         //    return user;
         //}
     }
-
-
 }
